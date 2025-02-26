@@ -3,5 +3,5 @@
 .RData
 .Ruserdata
 *.Rproj
-sql/**/*.csv
+data/sql/**/*.csv
 *venv*
