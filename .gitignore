@@ -5,3 +5,4 @@
 *.Rproj
 *venv*
 *__pycache__*
+/predictions

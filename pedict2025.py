@@ -109,7 +109,7 @@ class SakuraTransformer:
 
 # --- Prediction for 2025 ---
 def predict_for_2025(pretrained_model_path: str, save_results_dir: str):
-    test_year = 2020
+    test_year = 2022
     training_end_year = 2022
     cutoff_date = datetime.datetime(test_year, 2, 18)
 
@@ -127,7 +127,7 @@ def predict_for_2025(pretrained_model_path: str, save_results_dir: str):
 
     print(f"Number of rows in predictions: {predictions_df.shape[0]}")
     print(f"Columns in predictions: {predictions_df.columns}")
-    predictions_path = os.path.join(save_results_dir, "prediction.parquet")
+    predictions_path = os.path.join(save_results_dir, "predictions_" + str(test_year) + ".parquet")
     predictions_df.to_parquet(predictions_path)
 
     print(f"Predictions saved to: {predictions_path}")
@@ -139,7 +139,8 @@ if __name__ == "__main__":
         description="Load a pretrained Sakura Transformer and predict 2025 blossom dates."
     )
     parser.add_argument('--pretrained_model_path', type=str,
-                        default='src_test/transformer_d64_h4/sim_id_3/transformer_model_test_year_2024.pt',
+                        # default='src_test/transformer_d64_h4/sim_id_3/transformer_model_test_year_2022.pt',
+                        default='transformer_model_test_year_2022.pt',
                         help="Path to the pretrained transformer model (.pt file)")
     parser.add_argument('--save_results_dir', type=str, default='predictions/',
                         help="Directory where prediction results will be saved")
