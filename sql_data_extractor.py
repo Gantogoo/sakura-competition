@@ -47,6 +47,17 @@ def process_year_data(start_date = "1970-08-01", end_date= "1971-02-28", target_
     # print("Bloom Date: ", bloom_data['bloom_date'].values[0], " First Bloom Date: ", bloom_data['first_bloom_date'].values[0], " End Date: ", end_date)
     diff_full = (bloom_data['bloom_date'].values[0] - datetime.strptime(end_date, "%Y-%m-%d").date()).days - 1 # Subtract 1 to ignore the 28th of February
     diff_first = (bloom_data['first_bloom_date'].values[0] - datetime.strptime(end_date, "%Y-%m-%d").date()).days - 1 # Subtract 1 to ignore the 28th of February
+
+    days_to_full = (bloom_data['bloom_date'].values[0] - datetime.strptime(end_date, "%Y-%m-%d").date()).days
+    days_to_first = (bloom_data['first_bloom_date'].values[0] - datetime.strptime(start_date, "%Y-%m-%d").date()).days
+
+    bloom_offset = (bloom_data['bloom_date'].values[0] - bloom_data['first_bloom_date'].values[0]).days
+
+    print("Days to Full Bloom: ", days_to_full, " Days to First Bloom: ", days_to_first, " Bloom Offset: ", bloom_offset)
+    return
+
+    countdown_to_first = list(range(days_to_first, -bloom_offset - 1, -1))  # [days_to_first, ..., -bloom_offset]
+    countdown_to_full = list(range(days_to_full, -1, -1))
     # print("Difference in days: ", diff_full, " First Bloom Date: ", diff_first)
 
     if diff_full == None:
