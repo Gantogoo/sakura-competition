@@ -8,15 +8,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-inputstring = input("Database_name (int or japan (Default)): ").lower() or 'japan'
-
-if inputstring == "int":
-    database_name = os.getenv("MYSQL_DATABASE_INT")
-elif inputstring == "japan":
-    database_name = os.getenv("MYSQL_DATABASE_JAPAN")
-else:
-    print("Invalid input")
-    exit()
+database_name = os.getenv("MYSQL_DATABASE_JAPAN")
 
 # Database connection
 conn = mysql.connector.connect(
@@ -95,6 +87,8 @@ def load_bloom_data(file_path, file_path_first_bloom):
             """
 
             cursor.execute(insert_query, (year, city_name, longitude, latitude, altitude, full_bloom_date, first_bloom_date, bloom_doy))
+
+        print("Location: ", city_name, " data inserted.")
         
         conn.commit()
 

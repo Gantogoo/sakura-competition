@@ -2,18 +2,11 @@ import csv
 import mysql.connector
 from dotenv import load_dotenv
 import os
+import time
 
 load_dotenv()
 
-inputstring = input("Database_name (int or japan (Default)): ").lower() or 'japan'
-
-if inputstring == "int":
-    database_name = os.getenv("MYSQL_DATABASE_INT")
-elif inputstring == "japan":
-    database_name = os.getenv("MYSQL_DATABASE_JAPAN")
-else:
-    print("Invalid input")
-    exit()
+database_name = os.getenv("MYSQL_DATABASE_JAPAN")
 
 # Database connection
 conn = mysql.connector.connect(
@@ -61,7 +54,7 @@ def main():
             print(city_name_table, " has no temperature data")
             continue
     
-        create_table(city_name_table)
+        # create_table(city_name_table)
         
     print("Tables created successfully.")
 
@@ -81,7 +74,7 @@ def main():
                 VALUES (%s, %s, %s)
                 ON DUPLICATE KEY UPDATE temperature = VALUES(temperature);
             """
-            cursor.execute(insert_query, (date, temperature, city))
+            # cursor.execute(insert_query, (date, temperature, city))
         
         print(f"Data inserted for {date}.")
 
@@ -156,7 +149,7 @@ if __name__ == '__main__':
 
     main()
 
-    search_for_repairable_none(os.path.join(script_dir, 'data', file_name))
+    # search_for_repairable_none(os.path.join(script_dir, 'data', file_name))
 
 # Commit the changes and close connection
 conn.commit()

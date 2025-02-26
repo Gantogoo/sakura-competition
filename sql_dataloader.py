@@ -8,15 +8,7 @@ import math
 
 load_dotenv()
 
-inputstring = input("Database_name (int (Default) or japan): ").lower() or 'int'
-
-if inputstring == "int":
-    database_name = os.getenv("MYSQL_DATABASE_INT")
-elif inputstring == "japan":
-    database_name = os.getenv("MYSQL_DATABASE_JAPAN")
-else:
-    print("Invalid input")
-    exit()
+database_name = os.getenv("MYSQL_DATABASE_INT")
 
 # Connect to MySQL
 conn = mysql.connector.connect(
@@ -75,9 +67,13 @@ def process_data(station_name = "Liestal_Weideli"):
                   ON DUPLICATE KEY UPDATE latitude = VALUES(latitude), longitude = VALUES(longitude), altitude = VALUES(altitude), bloom_date = VALUES(bloom_date), first_bloom_date = VALUES(first_bloom_date);"""
         
         cursor.execute(query, (row[4], row[1], row[2], row[3], bloom_date, first_bloom_date))
+    
+    print("Data inserted successfully for ", station_name)
 
 if __name__ == '__main__':
-    process_data("Washington")
+    name_list = ["Liestal_Weideli", "Washington", "New_York", "Vancouver"]
+    for name in name_list:
+        process_data(name)
 
 # Commit and close
 conn.commit()
