@@ -158,17 +158,23 @@ class SakuraTransformer:
 
         return features_ts, targets_ts
     
-    def _prepare_sql_sequence(self, file_path_input: str, file_path_output: str) -> Tuple[TimeSeries, TimeSeries]:
+    def _prepare_sql_sequence(self, file_path: str, table: str) -> Tuple[TimeSeries, TimeSeries]:
         """
         Prepare input and target sequences for a single example.
         Returns:
           - features_ts: TimeSeries containing [temperature, lat, lng]
           - targets_ts: TimeSeries containing [countdown_first, countdown_full]
         """
-        if not file_path_input.startswith("data/sql/int/input/"):
-            file_path_input = "data/sql/int/input/" + file_path_input
-        if not file_path_output.startswith("data/sql/int/output/"):
-            file_path_output = "data/sql/int/output/" + file_path_output
+        if not file_path.startswith("data/sql/"):
+            if table == "japan":
+                file_path_input = "data/sql/japan/input/input_" + file_path
+                file_path_output = "data/sql/japan/output/output_" + file_path
+            elif table == "int":
+                file_path_input = "data/sql/int/input/input_" + file_path
+                file_path_output = "data/sql/int/output/output_" + file_path
+            else:
+                print("Invalid table name")
+                return
 
         df_input = pd.read_csv(file_path_input)
         df_output = pd.read_csv(file_path_output)
@@ -211,21 +217,52 @@ class SakuraTransformer:
             unscaled_data = scaler.inverse_transform(scaled_data)
         return unscaled_data
 
-    def train(self):
+    def train(self, type: str = "new"):
         """Train the transformer on the custom training set."""
         train_features = []
         train_targets = []
 
-        for train_idx in tqdm(self.train_indices, desc="Preparing training data"):
-            features, targets = self._prepare_sequence(train_idx)
-            train_features.append(features)
-            train_targets.append(targets)
+        if type == "new":
+            with open("file_list.txt", "r") as f:
+                file_list = f.readlines()
+                for file in file_list:
+                    file_name, table = file.split(",")
+                    year = file_name.split("_")[-2][:4]
+                    if int(year) <= self.training_end_year:
+                        features, targets = self._prepare_sql_sequence(file_name.strip(), table.strip())
+                        train_features.append(features)
+                        train_targets.append(targets)
+        elif type == "old":
+            for train_idx in tqdm(self.train_indices, desc="Preparing training data"):
+                features, targets = self._prepare_sequence(train_idx)
+                train_features.append(features)
+                train_targets.append(targets)
+        else:
+            raise ValueError(f"Invalid type: {type}")
 
         self.model.fit(
             series=train_targets,
             past_covariates=train_features,
             verbose=True
         )
+    
+    def test_new(self):
+        with open("file_list.txt", "r") as f:
+            file_list = f.readlines()
+            for file in file_list:
+                file_name, table = file.split(",")
+                year = file_name.split("_")[-2][:4]
+                if int(year) == self.test_year:
+                    features, targets = self._prepare_sql_sequence(file_name.strip(), table.strip())
+                    pred_targets = self.model.predict(
+                        n=1,
+                        series=targets[:-1],
+                        past_covariates=features[:-1],
+                    )
+                    pred_values = TimeSeries.values(pred_targets)[0]
+
+                    print(pred_values)
+                    
 
     def test(self,
              test_cutoff_date: Optional[datetime.datetime] = None,
@@ -386,6 +423,8 @@ def main(save_data_path: str,
     # Define the fixed test cutoff date (February 28). (Year will be adjusted per example.)
     cutoff_date = datetime.datetime(2000, 2, 28)  # Placeholder year; month and day are used.
 
+    version = "new"
+
     # Iterate over test years from 2001 to 2020.
     for test_year in range(2001, 2021):
         training_end_year = test_year - 1  # Use data from 1950 up to test_year-1 for training.
@@ -408,16 +447,16 @@ def main(save_data_path: str,
             sim_id=tqdm_bar_position
         )
 
-        features, targets = sakura_transformer._prepare_sql_sequence('input_Liestal_Weideli_1901-08-01_1902-02-28.csv', 'output_Liestal_Weideli_1901-08-01_1902-02-28.csv')
-        print("Features: ", features)
-        print("Targets: ", targets)
-        features, targets = sakura_transformer._prepare_sequence(0)
-        print("Features: ", features)
-        print("Targets: ", targets)
-        return
+        # Example for how to load the data from SQL files
+        # with open("file_list.txt", "r") as f:
+        #     file_list = f.readlines()
+        #     for file in file_list:
+        #         file_name, table = file.split(",")
+        #         fe, ta = sakura_transformer._prepare_sql_sequence(file_name.strip(), table.strip())
+        #         print(fe[0], ta[0])
 
         # Train the transformer.
-        sakura_transformer.train()
+        sakura_transformer.train(version)
 
         # Save the model for this test year.
         if save_model_path is not None:
@@ -429,20 +468,26 @@ def main(save_data_path: str,
 
         # Test (suppress extra output)
         with suppress_output():
-            predictions_df, metrics = sakura_transformer.test(test_cutoff_date=cutoff_date)
+            if version == "new":
+                sakura_transformer.test_new()
+            else:
+                predictions_df, metrics = sakura_transformer.test(test_cutoff_date=cutoff_date)
 
-        # Create a subfolder for this test year.
-        folder = os.path.join(save_data_path, f'test_year_{test_year}/')
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        if version == "new":
+            continue
+        else:
+            # Create a subfolder for this test year.
+            folder = os.path.join(save_data_path, f'test_year_{test_year}/')
+            if not os.path.exists(folder):
+                os.makedirs(folder)
 
-        # Save predictions (as a Parquet file) and metrics (as JSON).
-        predictions_df.to_parquet(os.path.join(folder, 'predictions.parquet'))
-        with open(os.path.join(folder, 'metrics.json'), 'w') as f:
-            json.dump(metrics, f)
+            # Save predictions (as a Parquet file) and metrics (as JSON).
+            predictions_df.to_parquet(os.path.join(folder, 'predictions.parquet'))
+            with open(os.path.join(folder, 'metrics.json'), 'w') as f:
+                json.dump(metrics, f)
 
-        if do_plot:
-            plot_mae_results(predictions_df=predictions_df, save_path=os.path.join(folder, 'mae'))
+            if do_plot:
+                plot_mae_results(predictions_df=predictions_df, save_path=os.path.join(folder, 'mae'))
 
 
 if __name__ == "__main__":

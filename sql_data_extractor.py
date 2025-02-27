@@ -8,6 +8,17 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler, RobustScaler
 from typing import Optional
 
+print("Do you want to create the csv files? (It will override the existing files and takes time)")
+input_string = input("no (Default) or yes: ") or "no"
+
+if input_string == "no":
+    exit()
+elif input_string == "yes":
+    pass
+else:
+    print("Invalid input")
+    exit()
+
 # Load database credentials from .env
 load_dotenv(override=True)
 
@@ -133,6 +144,14 @@ def process_year_data(table = "int", start_date = "1970-08-01", end_date= "1971-
     elif table == 'japan':
         input_file = os.path.join(script_dir,"data/sql/japan/input", f"input_{target_station}_{start_date}_{end_date}.csv")
         output_file = os.path.join(script_dir,"data/sql/japan/output", f"output_{target_station}_{start_date}_{end_date}.csv")
+
+    # Only uncomment if you want to re-write the file_list.txt
+    # if not os.path.exists("file_list.txt"):
+    #     with open("file_list.txt", 'w') as file:
+    #         file.write(f"{target_station}_{start_date}_{end_date}.csv, {table}\n")
+    # else:
+    #     with open("file_list.txt", 'a') as file:
+    #         file.write(f"{target_station}_{start_date}_{end_date}.csv, {table}\n")
         
     input_df.to_csv(input_file, index=False)
     output_df.to_csv(output_file, index=False)
@@ -198,11 +217,11 @@ def process_year_data(table = "int", start_date = "1970-08-01", end_date= "1971-
     # print(f"Input dataset saved as {input_file}")
     # print(f"Output dataset saved as {output_file}")
 
-def scale_data(script_dir, which_data = 'int'):
-    if which_data == 'int':
+def scale_data(script_dir, table = 'int'):
+    if table == 'int':
         folder_path_input = os.path.join(script_dir, "data/sql/int/input")
         folder_path_output = os.path.join(script_dir, "data/sql/int/output")
-    elif which_data == 'japan':
+    elif table == 'japan':
         folder_path_input = os.path.join(script_dir, "data/sql/japan/input")
         folder_path_output = os.path.join(script_dir, "data/sql/japan/output")
 
@@ -319,7 +338,7 @@ def scale_data(script_dir, which_data = 'int'):
 
     # Filter out only files
     files = [file for file in files_and_folders if os.path.isfile(os.path.join(folder_path_output, file))]
-
+    counter = 0
     for file in files:
         # Read the file
         df = pd.read_csv(os.path.join(folder_path_output, file))
@@ -333,11 +352,13 @@ def scale_data(script_dir, which_data = 'int'):
         # Save the file
         df.to_csv(os.path.join(folder_path_output, file), index=False)
 
-        print("Finished scaling data for ", file)
+        if counter % 100 == 0:
+            print("Finished scaling output data in table ", table, " for ", counter, " files")
+        counter += 1
 
     files_and_folders = os.listdir(folder_path_input)
     files = [file for file in files_and_folders if os.path.isfile(os.path.join(folder_path_input, file))]
-
+    counter = 0
     for file in files:
         # Read the file
         df = pd.read_csv(os.path.join(folder_path_input, file))
@@ -351,7 +372,9 @@ def scale_data(script_dir, which_data = 'int'):
         # Save the file
         df.to_csv(os.path.join(folder_path_input, file), index=False)
 
-        print("Finished scaling data for ", file)
+        if counter % 100 == 0:
+            print("Finished scaling input data in table ", table, " for ", counter, " files")
+        counter += 1
 
     # Apply scaling to each list in the column
     # df[column_name] = df[column_name].apply(scale_list)
