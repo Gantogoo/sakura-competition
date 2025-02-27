@@ -66,6 +66,7 @@ def load_bloom_data(file_path, file_path_first_bloom):
         filtered_rows = [row for row in rows_full[1:] if row[0].split('/')[1] == city_name]
 
         for row in filtered_rows:
+            first_bloom_date = ''
             latitude = row[1]
             longitude = row[2]
             altitude = row[3]
@@ -74,9 +75,9 @@ def load_bloom_data(file_path, file_path_first_bloom):
             bloom_doy = row[6]
 
             if city_name_in_first_bloom:
-                first_bloom_date = next((date for date in saved_row[2:-2] if date.startswith(year)), None)
+                first_bloom_date = saved_row[rows_first_bloom[0].index(year)]
 
-            if first_bloom_date == None:
+            if first_bloom_date == '':
                 first_bloom_date = calculate_first_bloom(datetime.strptime(full_bloom_date, "%Y-%m-%d"), int(bloom_doy))
             
             insert_query = f"""

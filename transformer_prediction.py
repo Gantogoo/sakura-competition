@@ -146,11 +146,54 @@ class SakuraTransformer:
             'lat': [row['lat']] * len(dates),
             'lng': [row['lng']] * len(dates)
         }, index=dates)
+        print(features)
 
         targets = pd.DataFrame({
             'countdown_first': row['countdown_to_first'],
             'countdown_full': row['countdown_to_full']
         }, index=dates)
+
+        features_ts = TimeSeries.from_dataframe(features)
+        targets_ts = TimeSeries.from_dataframe(targets)
+
+        return features_ts, targets_ts
+    
+    def _prepare_sql_sequence(self, file_path_input: str, file_path_output: str) -> Tuple[TimeSeries, TimeSeries]:
+        """
+        Prepare input and target sequences for a single example.
+        Returns:
+          - features_ts: TimeSeries containing [temperature, lat, lng]
+          - targets_ts: TimeSeries containing [countdown_first, countdown_full]
+        """
+        if not file_path_input.startswith("data/sql/int/input/"):
+            file_path_input = "data/sql/int/input/" + file_path_input
+        if not file_path_output.startswith("data/sql/int/output/"):
+            file_path_output = "data/sql/int/output/" + file_path_output
+
+        df_input = pd.read_csv(file_path_input)
+        df_output = pd.read_csv(file_path_output)
+        features = pd.DataFrame({
+            'temperature_array': df_input['temperature_array'],
+            'lat': df_input['latitude'],
+            'lng': df_input['longitude'],
+            'alt': df_input['altitude']
+        })
+
+        for i in range(len(features['temperature_array'])):
+            features['temperature_array'][i] = float(features['temperature_array'][i][1:-1])
+            features['lat'][i] = float(features['lat'][i][1:-1])
+            features['lng'][i] = float(features['lng'][i][1:-1])
+            features['alt'][i] = float(features['alt'][i][1:-1])
+        
+
+        targets = pd.DataFrame({
+            'countdown_first': df_output['first_bloom_day_countdown'],
+            'countdown_full': df_output['bloom_day_countdown']
+        })
+
+        for i in range(len(targets['countdown_first'])):
+            targets['countdown_first'][i] = float(targets['countdown_first'][i][1:-1])
+            targets['countdown_full'][i] = float(targets['countdown_full'][i][1:-1])
 
         features_ts = TimeSeries.from_dataframe(features)
         targets_ts = TimeSeries.from_dataframe(targets)
@@ -364,6 +407,14 @@ def main(save_data_path: str,
             device=device,
             sim_id=tqdm_bar_position
         )
+
+        features, targets = sakura_transformer._prepare_sql_sequence('input_Liestal_Weideli_1901-08-01_1902-02-28.csv', 'output_Liestal_Weideli_1901-08-01_1902-02-28.csv')
+        print("Features: ", features)
+        print("Targets: ", targets)
+        features, targets = sakura_transformer._prepare_sequence(0)
+        print("Features: ", features)
+        print("Targets: ", targets)
+        return
 
         # Train the transformer.
         sakura_transformer.train()
