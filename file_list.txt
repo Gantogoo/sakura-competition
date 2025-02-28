@@ -1,4 +1,3 @@
-Washington_1936-08-01_1937-02-28.csv, int
 Washington_1937-08-01_1938-02-28.csv, int
 Washington_1938-08-01_1939-02-28.csv, int
 Washington_1939-08-01_1940-02-28.csv, int

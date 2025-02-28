@@ -231,7 +231,7 @@ class SakuraTransformer:
                     if int(year) <= self.training_end_year:
                         features, targets = self._prepare_sql_sequence(file_name.strip(), table.strip())
                         train_features.append(features)
-                        train_targets.append(targets)
+                        train_targets.append(targets[:212])
         elif type == "old":
             for train_idx in tqdm(self.train_indices, desc="Preparing training data"):
                 features, targets = self._prepare_sequence(train_idx)
@@ -254,6 +254,9 @@ class SakuraTransformer:
                 year = file_name.split("_")[-2][:4]
                 if int(year) == self.test_year:
                     features, targets = self._prepare_sql_sequence(file_name.strip(), table.strip())
+                    features = features[:212]
+                    targets = targets[:212]
+
                     pred_targets = self.model.predict(
                         n=1,
                         series=targets[:-1],
@@ -426,7 +429,7 @@ def main(save_data_path: str,
     version = "new"
 
     # Iterate over test years from 2001 to 2020.
-    for test_year in range(2001, 2021):
+    for test_year in range(2024, 2025):
         training_end_year = test_year - 1  # Use data from 1950 up to test_year-1 for training.
         tqdm.write(f"\n===== Training with data up to {training_end_year} and testing on {test_year} =====")
 
