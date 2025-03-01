@@ -7,6 +7,7 @@ from datetime import datetime
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler, RobustScaler
 from typing import Optional
+import pickle
 
 print("Do you want to create the csv files? (It will override the existing files and takes time)")
 input_string = input("no (Default) or yes: ") or "no"
@@ -39,7 +40,7 @@ conn_int = mysql.connector.connect(
 )
 cursor_int = conn_int.cursor()
 
-def process_year_data(table = "int", start_date = "1970-08-01", end_date= "1971-02-28", target_station = "Liestal_Weideli", target_station_bloom = None):
+def process_year_data(table = "int", start_date = "1970-08-01", end_date= "1971-02-28", target_station = "Liestal_Weideli", target_station_bloom = None, prediction = False):
     if target_station_bloom is None:
         target_station_bloom = target_station + "_bloom"
 
@@ -49,55 +50,62 @@ def process_year_data(table = "int", start_date = "1970-08-01", end_date= "1971-
     elif table == 'japan':
         temp_name = "temperature"
         cursor = cursor_japan
-
+    
     # Extract bloom data for the target year
     target_year = end_date[:4]  # Extract the year
+
     query_bloom = f"""
     SELECT * FROM {target_station_bloom} WHERE year = "{target_year}";
     """
 
+    if prediction:
+        query_bloom = f"""
+        SELECT * FROM {target_station_bloom} LIMIT 1;
+        """
+
     cursor.execute(query_bloom)
     bloom_data = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+    
+    if not prediction:
+        # print("Bloom Date: ", bloom_data['bloom_date'].values[0], " First Bloom Date: ", bloom_data['first_bloom_date'].values[0], " End Date: ", end_date)
+        diff_full = (bloom_data['bloom_date'].values[0] - datetime.strptime(end_date, "%Y-%m-%d").date()).days - 1 # Subtract 1 to ignore the 28th of February
+        diff_first = (bloom_data['first_bloom_date'].values[0] - datetime.strptime(end_date, "%Y-%m-%d").date()).days - 1 # Subtract 1 to ignore the 28th of February
 
-    # print("Bloom Date: ", bloom_data['bloom_date'].values[0], " First Bloom Date: ", bloom_data['first_bloom_date'].values[0], " End Date: ", end_date)
-    diff_full = (bloom_data['bloom_date'].values[0] - datetime.strptime(end_date, "%Y-%m-%d").date()).days - 1 # Subtract 1 to ignore the 28th of February
-    diff_first = (bloom_data['first_bloom_date'].values[0] - datetime.strptime(end_date, "%Y-%m-%d").date()).days - 1 # Subtract 1 to ignore the 28th of February
+        days_to_full = (bloom_data['bloom_date'].values[0] - datetime.strptime(start_date, "%Y-%m-%d").date()).days
+        days_to_first = (bloom_data['first_bloom_date'].values[0] - datetime.strptime(start_date, "%Y-%m-%d").date()).days
 
-    days_to_full = (bloom_data['bloom_date'].values[0] - datetime.strptime(start_date, "%Y-%m-%d").date()).days
-    days_to_first = (bloom_data['first_bloom_date'].values[0] - datetime.strptime(start_date, "%Y-%m-%d").date()).days
+        bloom_offset = (bloom_data['bloom_date'].values[0] - bloom_data['first_bloom_date'].values[0]).days
 
-    bloom_offset = (bloom_data['bloom_date'].values[0] - bloom_data['first_bloom_date'].values[0]).days
+        # print("Days to Full Bloom: ", days_to_full, " Days to First Bloom: ", days_to_first, " Bloom Offset: ", bloom_offset)
 
-    # print("Days to Full Bloom: ", days_to_full, " Days to First Bloom: ", days_to_first, " Bloom Offset: ", bloom_offset)
+        countdown_to_first = list(range(days_to_first, -bloom_offset - 1, -1))  # [days_to_first, ..., -bloom_offset]
+        # if target_station == "Nago":
+        #     print("Nago")
+        #     print("Blooming Date: ", bloom_data['bloom_date'].values[0], " Start Date countdown: ", datetime.strptime(start_date, "%Y-%m-%d").date())
+        #     print("First Bloom Date: ", bloom_data['first_bloom_date'].values[0])
+        #     print("Days to Full Bloom: ", days_to_full)
+        #     print("Days to First Bloom: ", days_to_first, " Bloom Offset: ", bloom_offset)
+        #     print("Countdown to First Bloom: ", countdown_to_first)
+        # if target_station == "Izuhara":
+        #     print("Izuhara")
+        #     print("Blooming Date: ", bloom_data['bloom_date'].values[0], " Start Date countdown: ", datetime.strptime(start_date, "%Y-%m-%d").date())
+        #     print("First Bloom Date: ", bloom_data['first_bloom_date'].values[0])
+        #     print("Days to Full Bloom: ", days_to_full)
+        #     print("Days to First Bloom: ", days_to_first, " Bloom Offset: ", bloom_offset)
+        #     print("Countdown to First Bloom: ", countdown_to_first)
 
-    countdown_to_first = list(range(days_to_first, -bloom_offset - 1, -1))  # [days_to_first, ..., -bloom_offset]
-    # if target_station == "Nago":
-    #     print("Nago")
-    #     print("Blooming Date: ", bloom_data['bloom_date'].values[0], " Start Date countdown: ", datetime.strptime(start_date, "%Y-%m-%d").date())
-    #     print("First Bloom Date: ", bloom_data['first_bloom_date'].values[0])
-    #     print("Days to Full Bloom: ", days_to_full)
-    #     print("Days to First Bloom: ", days_to_first, " Bloom Offset: ", bloom_offset)
-    #     print("Countdown to First Bloom: ", countdown_to_first)
-    # if target_station == "Izuhara":
-    #     print("Izuhara")
-    #     print("Blooming Date: ", bloom_data['bloom_date'].values[0], " Start Date countdown: ", datetime.strptime(start_date, "%Y-%m-%d").date())
-    #     print("First Bloom Date: ", bloom_data['first_bloom_date'].values[0])
-    #     print("Days to Full Bloom: ", days_to_full)
-    #     print("Days to First Bloom: ", days_to_first, " Bloom Offset: ", bloom_offset)
-    #     print("Countdown to First Bloom: ", countdown_to_first)
+        countdown_to_full = list(range(days_to_full, -1, -1))
 
-    countdown_to_full = list(range(days_to_full, -1, -1))
+        # print("Countdown to Full Bloom: ", countdown_to_full, " Countdown to First Bloom: ", countdown_to_first)
 
-    # print("Countdown to Full Bloom: ", countdown_to_full, " Countdown to First Bloom: ", countdown_to_first)
+        # print("Difference in days: ", diff_full, " First Bloom Date: ", diff_first)
 
-    # print("Difference in days: ", diff_full, " First Bloom Date: ", diff_first)
-
-    if diff_full == None:
-        print("No bloom date")
-        return
-    elif diff_full < 0:
-        # print(f"Bloom date is in the past, there the data from {target_station} is not used!")
-        return
+        if diff_full == None:
+            print("No bloom date")
+            return
+        elif diff_full < 0:
+            # print(f"Bloom date is in the past, there the data from {target_station} is not used!")
+            return
 
     # Extract temperature data for the year before the target date
     query_temp = f"""
@@ -130,20 +138,26 @@ def process_year_data(table = "int", start_date = "1970-08-01", end_date= "1971-
     #     "bloom_days": [diff_full],
     #     "first_bloom_days": [diff_first]
     # }
-    output_data = {
-        "bloom_day_countdown": np.array(countdown_to_full),
-        "first_bloom_day_countdown": np.array(countdown_to_first)
-    }
-    output_df = pd.DataFrame(output_data)
+    if not prediction:
+        output_data = {
+            "bloom_day_countdown": np.array(countdown_to_full),
+            "first_bloom_day_countdown": np.array(countdown_to_first)
+        }
+        output_df = pd.DataFrame(output_data)
     
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
-    if table == 'int':
+    if table == 'int' and not prediction:
         input_file = os.path.join(script_dir,"data/sql/int/input", f"input_{target_station}_{start_date}_{end_date}.csv")
         output_file = os.path.join(script_dir,"data/sql/int/output", f"output_{target_station}_{start_date}_{end_date}.csv")
-    elif table == 'japan':
+    elif table == 'int' and prediction:
+        print("Prediction")
+        input_file = os.path.join(script_dir,"data/sql/int/prediction", f"input_{target_station}_{start_date}_{end_date}_prediction.csv")
+    elif table == 'japan' and not prediction:
         input_file = os.path.join(script_dir,"data/sql/japan/input", f"input_{target_station}_{start_date}_{end_date}.csv")
         output_file = os.path.join(script_dir,"data/sql/japan/output", f"output_{target_station}_{start_date}_{end_date}.csv")
+    elif table == 'japan' and prediction:
+        input_file = os.path.join(script_dir,"data/sql/japan/prediction", f"input_{target_station}_{start_date}_{end_date}_prediction.csv")
 
     # Only uncomment if you want to re-write the file_list.txt
     # if not os.path.exists("file_list.txt"):
@@ -154,65 +168,62 @@ def process_year_data(table = "int", start_date = "1970-08-01", end_date= "1971-
     #         file.write(f"{target_station}_{start_date}_{end_date}.csv, {table}\n")
         
     input_df.to_csv(input_file, index=False)
-    output_df.to_csv(output_file, index=False)
+    if not prediction:
+        output_df.to_csv(output_file, index=False)
 
-    if not os.path.exists("tmp_full.txt"):
-        with open("tmp_full.txt", 'w') as file:
-            for number in countdown_to_full:
-                file.write(str(number) + " ")
-            file.write("\n")
-    else:
-        with open("tmp_full.txt", 'a') as file:
-            for number in countdown_to_full:
-                file.write(str(number) + " ")
-            file.write("\n")
+        if not os.path.exists("tmp_full.txt"):
+            with open("tmp_full.txt", 'w') as file:
+                for number in countdown_to_full:
+                    file.write(str(number) + " ")
+                file.write("\n")
+        else:
+            with open("tmp_full.txt", 'a') as file:
+                for number in countdown_to_full:
+                    file.write(str(number) + " ")
+                file.write("\n")
 
-    if not os.path.exists("tmp_first.txt"):
-        with open("tmp_first.txt", 'w') as file:
-            for number in countdown_to_first:
-                file.write(str(number) + " ")
-            file.write("\n")
-    else:
-        with open("tmp_first.txt", 'a') as file:
-            for number in countdown_to_first:
-                if str(number) == "18544":
-                    print("Station: ", target_station, "start_date: ", start_date, "end_date: ", end_date)
-                if str() == "-1052":
-                    print("Station: ", target_station, "start_date: ", start_date, "end_date: ", end_date)
-                file.write(str(number) + " ")
-            file.write("\n")
+        if not os.path.exists("tmp_first.txt"):
+            with open("tmp_first.txt", 'w') as file:
+                for number in countdown_to_first:
+                    file.write(str(number) + " ")
+                file.write("\n")
+        else:
+            with open("tmp_first.txt", 'a') as file:
+                for number in countdown_to_first:
+                    file.write(str(number) + " ")
+                file.write("\n")
 
-    if not os.path.exists("tmp_temp.txt"):
-        with open("tmp_temp.txt", 'w') as file:
-            for number in temperature_array:
-                file.write(str(number) + " ")
-            file.write("\n")
-    else:
-        with open("tmp_temp.txt", 'a') as file:
-            for number in temperature_array:
-                file.write(str(number) + " ")
-            file.write("\n")
+        if not os.path.exists("tmp_temp.txt"):
+            with open("tmp_temp.txt", 'w') as file:
+                for number in temperature_array:
+                    file.write(str(number) + " ")
+                file.write("\n")
+        else:
+            with open("tmp_temp.txt", 'a') as file:
+                for number in temperature_array:
+                    file.write(str(number) + " ")
+                file.write("\n")
 
-    if not os.path.exists("tmp_lat.txt"):
-        with open("tmp_lat.txt", 'w') as file:
-            file.write(str(latitude) + "\n")
-    else:
-        with open("tmp_lat.txt", 'a') as file:
-            file.write(str(latitude) + "\n")
+        if not os.path.exists("tmp_lat.txt"):
+            with open("tmp_lat.txt", 'w') as file:
+                file.write(str(latitude) + "\n")
+        else:
+            with open("tmp_lat.txt", 'a') as file:
+                file.write(str(latitude) + "\n")
 
-    if not os.path.exists("tmp_lng.txt"):
-        with open("tmp_lng.txt", 'w') as file:
-            file.write(str(longitude) + "\n")
-    else:
-        with open("tmp_lng.txt", 'a') as file:
-            file.write(str(longitude) + "\n")
-    
-    if not os.path.exists("tmp_alt.txt"):
-        with open("tmp_alt.txt", 'w') as file:
-            file.write(str(altitude) + "\n")
-    else:
-        with open("tmp_alt.txt", 'a') as file:
-            file.write(str(altitude) + "\n")
+        if not os.path.exists("tmp_lng.txt"):
+            with open("tmp_lng.txt", 'w') as file:
+                file.write(str(longitude) + "\n")
+        else:
+            with open("tmp_lng.txt", 'a') as file:
+                file.write(str(longitude) + "\n")
+
+        if not os.path.exists("tmp_alt.txt"):
+            with open("tmp_alt.txt", 'w') as file:
+                file.write(str(altitude) + "\n")
+        else:
+            with open("tmp_alt.txt", 'a') as file:
+                file.write(str(altitude) + "\n")
 
     # print(f"Input dataset saved as {input_file}")
     # print(f"Output dataset saved as {output_file}")
@@ -290,7 +301,7 @@ def scale_data(script_dir, table = 'int'):
     robust_lng.fit(all_values_lng.reshape(-1, 1))
     robust_alt.fit(all_values_alt.reshape(-1, 1))
 
-        # Function to scale lists/arrays
+    # Function to scale lists/arrays
     def scale_list_first(x):
         if isinstance(x, int): 
             x = [x]
@@ -379,6 +390,21 @@ def scale_data(script_dir, table = 'int'):
     # Apply scaling to each list in the column
     # df[column_name] = df[column_name].apply(scale_list)
 
+    scalers = {}
+
+    scalers['countdown_to_first'] = scaler_first
+    scalers['countdown_to_full'] = scaler_full
+    scalers['temps'] = scaler_temp
+
+    scalers['lat'] = robust_lat
+    scalers['lng'] = robust_lng
+    scalers['alt'] = robust_alt
+
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+
+    with open(os.path.join(script_dir,  "new_scalers.pickle"), 'wb') as f:
+        pickle.dump(scalers, f)
+
 def international_data_loader():
     start_date = "08-01"
     end_date = "02-28"
@@ -459,19 +485,115 @@ def japan_data_loader():
 
             process_year_data('japan', str(year-1)+"-"+start_date, str(year)+"-"+end_date, station, station_bloom)  
 
-def main():
-    international_data_loader()
-    japan_data_loader()
+def extract_prediction_year(year = 2025):
+    cities = ["Washington", "Liestal_Weideli", "New_York", "Vancouver", "Kyoto"]
+    for city in cities:
+        city_bloom = city + "_bloom"
+        print("City: ", city, " Years: ", year)
 
+        prediction = True
+
+        if city == "Kyoto":
+            process_year_data('japan', str(year-1)+"-08-01", str(year)+"-02-28", city, city_bloom, prediction)
+        else:
+            process_year_data('int', str(year-1)+"-08-01", str(year)+"-02-28", city, city_bloom, prediction)
+
+def scale_prediction_data():
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    scale_data(script_dir, 'int')
-    scale_data(script_dir, 'japan')
-    os.remove(os.path.join(script_dir, "tmp_full.txt"))
-    os.remove(os.path.join(script_dir, "tmp_first.txt"))
-    os.remove(os.path.join(script_dir, "tmp_temp.txt"))
-    os.remove(os.path.join(script_dir, "tmp_lat.txt"))
-    os.remove(os.path.join(script_dir, "tmp_lng.txt"))
-    os.remove(os.path.join(script_dir, "tmp_alt.txt"))
+    int_file_path = os.path.join(script_dir, 'data/sql/int/prediction')
+    japan_file_path = os.path.join(script_dir, 'data/sql/japan/prediction')
+
+    files_and_folders_int = os.listdir(int_file_path)
+    files_and_folders_japan = os.listdir(japan_file_path)
+
+    # Filter out only files
+    files_int = [file for file in files_and_folders_int if os.path.isfile(os.path.join(int_file_path, file))]
+    files_japan = [file for file in files_and_folders_japan if os.path.isfile(os.path.join(japan_file_path, file))]
+
+    with open(os.path.join(script_dir, 'new_scalers.pickle'), 'rb') as f:
+        scalers = pickle.load(f)
+
+    scaler_temp = scalers['temps']
+    robust_lat = scalers['lat']
+    robust_lng = scalers['lng']
+    robust_alt = scalers['alt']
+
+    def scale_list_temp(x):
+        if isinstance(x, float): 
+            x = [x]
+        if len(x) == 0:
+            return x
+        return scaler_temp.transform(np.array(x).reshape(-1, 1)).flatten().tolist()
+    
+    def scale_list_lat(x):
+        if isinstance(x, float): 
+            x = [x]
+        if len(x) == 0:
+            return x
+        return robust_lat.transform(np.array(x).reshape(-1, 1)).flatten().tolist()
+    
+    def scale_list_lng(x):
+        if isinstance(x, float): 
+            x = [x]
+        if len(x) == 0:
+            return x
+        return robust_lng.transform(np.array(x).reshape(-1, 1)).flatten().tolist()
+
+    def scale_list_alt(x):
+        if isinstance(x, float): 
+            x = [x]
+        if len(x) == 0:
+            return x
+        return robust_alt.transform(np.array(x).reshape(-1, 1)).flatten().tolist()
+
+    for file in files_int:
+        # Read the file
+        df = pd.read_csv(os.path.join(int_file_path, file))
+
+        # Apply scaling to each list in the column
+        df["temperature_array"] = df['temperature_array'].apply(scale_list_temp)
+        df["latitude"] = df['latitude'].apply(scale_list_lat)
+        df["longitude"] = df['longitude'].apply(scale_list_lng)
+        df["altitude"] = df['altitude'].apply(scale_list_alt)
+
+        # Save the file
+        df.to_csv(os.path.join(int_file_path, file), index=False)
+
+        print("File ", file, " scaled")
+
+    for file in files_japan:
+        # Read the file
+        df = pd.read_csv(os.path.join(japan_file_path, file))
+
+        # Apply scaling to each list in the column
+        df["temperature_array"] = df['temperature_array'].apply(scale_list_temp)
+        df["latitude"] = df['latitude'].apply(scale_list_lat)
+        df["longitude"] = df['longitude'].apply(scale_list_lng)
+        df["altitude"] = df['altitude'].apply(scale_list_alt)
+
+        # Save the file
+        df.to_csv(os.path.join(japan_file_path, file), index=False)
+
+        print("File ", file, " scaled")
+
+
+
+def main():
+    # international_data_loader()
+    # japan_data_loader()
+
+    # script_dir = os.path.dirname(os.path.realpath(__file__))
+    # scale_data(script_dir, 'int')
+    # scale_data(script_dir, 'japan')
+    # os.remove(os.path.join(script_dir, "tmp_full.txt"))
+    # os.remove(os.path.join(script_dir, "tmp_first.txt"))
+    # os.remove(os.path.join(script_dir, "tmp_temp.txt"))
+    # os.remove(os.path.join(script_dir, "tmp_lat.txt"))
+    # os.remove(os.path.join(script_dir, "tmp_lng.txt"))
+    # os.remove(os.path.join(script_dir, "tmp_alt.txt"))
+
+    # extract_prediction_year(2025)
+    scale_prediction_data()
 
 
 

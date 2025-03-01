@@ -63,6 +63,7 @@ def main():
         date = row[0]
         for idx in indices:
             city = city_names[idx]
+            
             temperature = row[idx + 1]
 
             if temperature == '':
@@ -74,7 +75,7 @@ def main():
                 VALUES (%s, %s, %s)
                 ON DUPLICATE KEY UPDATE temperature = VALUES(temperature);
             """
-            # cursor.execute(insert_query, (date, temperature, city))
+            cursor.execute(insert_query, (date, temperature, city))
         
         print(f"Data inserted for {date}.")
 
